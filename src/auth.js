@@ -48,8 +48,12 @@ export function initAuth(onSignIn, onExpire) {
         onSignIn(resp.access_token)
       },
     })
-    // 세션에 토큰이 남아 있으면 바로 알려줌
-    if (isSignedIn()) onSignIn(_accessToken)
+    // 세션에 토큰이 남아 있으면 바로 알려줌, 없으면 로그인 화면으로
+    if (isSignedIn()) {
+      onSignIn(_accessToken)
+    } else {
+      onExpire?.()
+    }
   }
   tryInit()
 }
