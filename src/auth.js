@@ -1,6 +1,7 @@
 import {
   GoogleAuthProvider,
   signInWithCredential,
+  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   onAuthStateChanged,
@@ -13,13 +14,13 @@ const SCOPES    = 'https://www.googleapis.com/auth/tasks'
 const TOKEN_KEY = 'gapi_access_token'
 const TOKEN_EXP = 'gapi_token_exp'
 
-// 모바일 감지 (팝업 차단 브라우저 → 리디렉션 방식 사용)
 const IS_MOBILE = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
 let tokenClient   = null  // 데스크톱 GIS 전용
 let _token        = sessionStorage.getItem(TOKEN_KEY) || null
 let _expiry       = parseInt(sessionStorage.getItem(TOKEN_EXP) || '0', 10)
 let _firebaseUser = null
+let _onSignIn     = null  // 팝업 완료 후 직접 호출하기 위해 보관
 
 function _saveToken(token, expiresIn = 3540) {
   _token  = token
@@ -84,29 +85,29 @@ function _initDesktop(onSignIn, onExpire) {
   tryInit()
 }
 
-// ── 모바일: Firebase Auth 리디렉션 흐름 ────────────────────────────
+// ── 모바일: Firebase Auth 팝업 흐름 ────────────────────────────────
 async function _initMobile(onSignIn, onExpire) {
+  _onSignIn = onSignIn  // requestSignIn 팝업 완료 후 직접 호출
   if (!auth) { onExpire?.(); return }
+
+  // 이전 redirect 흐름 잔여 결과 처리 (폴백)
   try {
-    // 구글에서 리디렉션 후 돌아온 경우 → 결과 처리
     const result = await getRedirectResult(auth)
-    if (result) {
+    if (result?.user) {
       const cred = GoogleAuthProvider.credentialFromResult(result)
-      if (cred?.accessToken) {
-        _saveToken(cred.accessToken)
-        _firebaseUser = result.user
-        onSignIn(result.user)
-        return
-      }
+      if (cred?.accessToken) _saveToken(cred.accessToken)
+      _firebaseUser = result.user
+      onSignIn(result.user)
+      return
     }
   } catch (e) {
     console.warn('[auth] redirect result error:', e.message)
   }
 
-  // 리디렉션 결과 없음 → 기존 세션 확인
+  // 기존 세션 확인 (페이지 재방문 시)
   onAuthStateChanged(auth, (user) => {
     _firebaseUser = user
-    if (isSignedIn()) {
+    if (user && isSignedIn()) {
       onSignIn(_token)
     } else {
       onExpire?.()
@@ -125,8 +126,22 @@ export function initAuth(onSignIn, onExpire) {
 export async function requestSignIn() {
   if (IS_MOBILE) {
     if (!auth) return
-    // 리디렉션 방식 — 팝업 차단 우회 (페이지 이동 후 복귀)
-    await signInWithRedirect(auth, _fbProvider())
+    try {
+      // 팝업 방식 (삼성 인터넷·Chrome에서 redirect 루프 없이 동작)
+      const result = await signInWithPopup(auth, _fbProvider())
+      const cred = GoogleAuthProvider.credentialFromResult(result)
+      if (cred?.accessToken) {
+        _saveToken(cred.accessToken)
+        _firebaseUser = result.user
+        _onSignIn?.(result.user)
+      }
+    } catch (e) {
+      if (e.code === 'auth/popup-blocked') {
+        // 팝업이 차단된 경우에만 redirect로 폴백
+        await signInWithRedirect(auth, _fbProvider())
+      }
+      // auth/popup-closed-by-user: 사용자가 취소, 무시
+    }
   } else {
     // 데스크톱 GIS 팝업
     if (tokenClient) {
