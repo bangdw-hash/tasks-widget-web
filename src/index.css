@@ -578,3 +578,37 @@ input, textarea { font: inherit; }
   letter-spacing: 0.5px;
   min-height: 42px;
 }
+
+/* ── 인앱 브라우저 경고 ───────────────────────────────────────────── */
+.inapp-guide {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 16px 0;
+  text-align: left;
+}
+
+.inapp-step {
+  font-size: 14px;
+  color: var(--text);
+  padding: 5px 0;
+  line-height: 1.5;
+}
+
+.inapp-step + .inapp-step {
+  border-top: 1px solid var(--border);
+}
+
+.url-box {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  word-break: break-all;
+  color: var(--muted);
+  font-family: monospace;
+  text-align: left;
+  margin-bottom: 4px;
+}

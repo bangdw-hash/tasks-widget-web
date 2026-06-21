@@ -1,6 +1,59 @@
 import { requestSignIn } from '../auth.js'
 
+// 카카오톡·인스타그램 등 인앱 브라우저는 Google OAuth 차단됨 (disallowed_useragent)
+function isInAppBrowser() {
+  const ua = navigator.userAgent || ''
+  return (
+    /KAKAOTALK|NAVER|Instagram|Line\/|FB_IAB|FBAN|FBAV|Twitter|Snapchat|TikTok/i.test(ua) ||
+    (/Android/.test(ua) && !/Chrome/i.test(ua)) ||
+    (/iPhone|iPad/.test(ua) && !/Safari/i.test(ua))
+  )
+}
+
+function copyUrl() {
+  const url = window.location.href
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => alert('주소가 복사됐습니다.\nChrome에서 붙여넣기 해주세요.'))
+  } else {
+    // fallback
+    const el = document.createElement('textarea')
+    el.value = url
+    document.body.appendChild(el)
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
+    alert('주소가 복사됐습니다.\nChrome에서 붙여넣기 해주세요.')
+  }
+}
+
 export default function LoginScreen({ loading }) {
+  if (isInAppBrowser()) {
+    return (
+      <div className="login-screen">
+        <div className="login-card">
+          <div className="login-icon">🌐</div>
+          <h1>Chrome으로 열어주세요</h1>
+          <p>
+            카카오톡 등 앱 내 브라우저에서는<br />
+            Google 보안 정책으로 로그인이 차단됩니다.
+          </p>
+
+          <div className="inapp-guide">
+            <div className="inapp-step">① 우측 상단 메뉴(⋮) 탭</div>
+            <div className="inapp-step">② <strong>Chrome으로 열기</strong> 선택</div>
+            <div className="inapp-step">③ 로그인 진행</div>
+          </div>
+
+          <p style={{ fontSize: 13, marginBottom: 8 }}>또는 주소를 복사해 Chrome에서 직접 입력:</p>
+          <div className="url-box">{window.location.href}</div>
+          <button className="btn-google" style={{ marginTop: 12 }} onClick={copyUrl}>
+            주소 복사
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="login-screen">
       <div className="login-card">
