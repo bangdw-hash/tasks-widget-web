@@ -1,12 +1,65 @@
 import { useState } from 'react'
 import { saveSettings, applySettings, DEFAULTS } from '../cloudSettings.js'
 
-const FONTS = [
-  { value: 'Malgun Gothic',        label: '맑은 고딕 (Windows)' },
-  { value: 'Apple SD Gothic Neo',  label: 'Apple SD 고딕 Neo' },
-  { value: 'NanumGothic',          label: '나눔고딕' },
-  { value: 'system-ui',            label: '시스템 기본' },
+// Google Fonts로 제공되는 폰트는 선택 시 동적으로 로드
+const FONT_GROUPS = [
+  {
+    label: '시스템',
+    fonts: [
+      { value: 'system-ui',           name: '시스템 기본' },
+      { value: 'Malgun Gothic',        name: '맑은 고딕 (Windows)' },
+      { value: 'Apple SD Gothic Neo',  name: 'Apple SD 고딕 Neo (Mac)' },
+      { value: 'Segoe UI',             name: 'Segoe UI (Windows)' },
+    ],
+  },
+  {
+    label: '고딕 / 산세리프',
+    fonts: [
+      { value: 'Noto Sans KR',         name: 'Noto Sans KR',    google: true },
+      { value: 'Gothic A1',            name: 'Gothic A1',        google: true },
+      { value: 'IBM Plex Sans KR',     name: 'IBM Plex Sans KR', google: true },
+      { value: 'NanumGothic',          name: '나눔고딕',          google: true },
+      { value: 'Do Hyeon',             name: '도현체',            google: true },
+      { value: 'Black Han Sans',       name: '검은고딕',          google: true },
+      { value: 'Jua',                  name: '주아체',            google: true },
+      { value: 'Sunflower',            name: '선플라워',          google: true },
+      { value: 'Hahmlet',              name: '함렛',             google: true },
+    ],
+  },
+  {
+    label: '명조 / 세리프',
+    fonts: [
+      { value: 'Noto Serif KR',        name: 'Noto Serif KR',   google: true },
+      { value: 'NanumMyeongjo',        name: '나눔명조',          google: true },
+    ],
+  },
+  {
+    label: '손글씨 / 디자인',
+    fonts: [
+      { value: 'Gaegu',                name: '개구체 (Gaegu)',   google: true },
+      { value: 'Poor Story',           name: '가난한이야기',      google: true },
+      { value: 'Single Day',           name: 'Single Day',       google: true },
+      { value: 'Cute Font',            name: 'Cute Font',        google: true },
+    ],
+  },
 ]
+
+const ALL_FONTS = FONT_GROUPS.flatMap(g => g.fonts)
+
+function loadGoogleFont(name) {
+  const id = `gf-${name.replace(/\s+/g, '-')}`
+  if (document.getElementById(id)) return
+  const link = document.createElement('link')
+  link.id   = id
+  link.rel  = 'stylesheet'
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(name)}&display=swap`
+  document.head.appendChild(link)
+}
+
+// 설정 패널 열릴 때 현재 선택된 폰트 미리 로드
+ALL_FONTS.filter(f => f.google).forEach(f => {
+  // 실제 선택 시에만 로드하므로 여기서는 로드하지 않음
+})
 
 export default function SettingsPanel({ settings, onClose, onUpdate }) {
   const [local, setLocal]   = useState(settings)
@@ -14,6 +67,10 @@ export default function SettingsPanel({ settings, onClose, onUpdate }) {
   const [synced, setSynced] = useState(false)
 
   const update = (key, val) => {
+    if (key === 'font_family') {
+      const font = ALL_FONTS.find(f => f.value === val)
+      if (font?.google) loadGoogleFont(val)
+    }
     const next = { ...local, [key]: val }
     setLocal(next)
     applySettings(next)
@@ -25,13 +82,15 @@ export default function SettingsPanel({ settings, onClose, onUpdate }) {
     setSaving(false)
     setSynced(true)
     onUpdate(local)
-    setTimeout(onClose, 600)
+    setTimeout(onClose, 700)
   }
 
   const handleReset = () => {
     setLocal(DEFAULTS)
     applySettings(DEFAULTS)
   }
+
+  const currentFont = ALL_FONTS.find(f => f.value === local.font_family)
 
   return (
     <>
@@ -71,13 +130,26 @@ export default function SettingsPanel({ settings, onClose, onUpdate }) {
 
           <div className="field">
             <label className="field-label">글꼴</label>
+
+            {/* 미리보기 */}
+            <div
+              className="font-preview"
+              style={{ fontFamily: `'${local.font_family}', sans-serif` }}
+            >
+              가나다라 ABC 123
+            </div>
+
             <select
               className="field-input"
               value={local.font_family}
               onChange={e => update('font_family', e.target.value)}
             >
-              {FONTS.map(f => (
-                <option key={f.value} value={f.value}>{f.label}</option>
+              {FONT_GROUPS.map(group => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.fonts.map(f => (
+                    <option key={f.value} value={f.value}>{f.name}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -93,7 +165,7 @@ export default function SettingsPanel({ settings, onClose, onUpdate }) {
               className="size-slider"
             />
             <div className="size-labels">
-              <span>11</span><span>20</span>
+              <span>11px</span><span>20px</span>
             </div>
           </div>
 
