@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { initAuth, requestSignIn, signOut, scheduleRefresh } from './auth.js'
+import { loadSettings, saveSettings, applySettings, resetStyles, DEFAULTS } from './cloudSettings.js'
 import * as api from './api.js'
 import LoginScreen from './components/LoginScreen.jsx'
 import Header from './components/Header.jsx'
 import TaskItem from './components/TaskItem.jsx'
 import CompletedSection from './components/CompletedSection.jsx'
 import TaskModal from './components/TaskModal.jsx'
+import SettingsPanel from './components/SettingsPanel.jsx'
 
 export default function App() {
   const [authed, setAuthed]           = useState(false)
@@ -16,8 +18,10 @@ export default function App() {
   const [completed, setCompleted]     = useState([])
   const [loadingComp, setLoadingComp] = useState(false)
   const [syncing, setSyncing]         = useState(false)
-  const [modal, setModal]             = useState(null)  // { mode:'add'|'edit', task? }
+  const [modal, setModal]             = useState(null)
   const [error, setError]             = useState('')
+  const [settings, setSettings]       = useState(DEFAULTS)
+  const [showSettings, setShowSettings] = useState(false)
 
   // ── 인증 초기화 ────────────────────────────────────────────────────
   useEffect(() => {
@@ -27,11 +31,19 @@ export default function App() {
     )
   }, [])
 
-  // ── 로그인 후 목록 로드 ───────────────────────────────────────────
+  // ── 로그인 후 목록 + 설정 로드 ────────────────────────────────────
   useEffect(() => {
     if (!authed) return
     scheduleRefresh(() => setAuthed(false))
     loadLists()
+    loadSettings().then(s => {
+      if (s) { setSettings(s); applySettings(s) }
+    })
+  }, [authed])
+
+  // ── 로그아웃 시 스타일 초기화 ─────────────────────────────────────
+  useEffect(() => {
+    if (!authed) resetStyles()
   }, [authed])
 
   const loadLists = useCallback(async () => {
@@ -83,7 +95,7 @@ export default function App() {
     setTasks(prev => prev.filter(t => t.id !== taskId))
     try {
       await api.completeTask(currentId, taskId)
-      setCompleted([])  // 완료됨 목록 무효화
+      setCompleted([])
     } catch { loadTasks() }
   }
 
@@ -119,7 +131,7 @@ export default function App() {
   const handleEdit = async ({ title, due, notes }) => {
     const { task } = modal
     setModal(null)
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, title, due: due ? `${due}T00:00:00.000Z` : '' , notes } : t))
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, title, due: due ? `${due}T00:00:00.000Z` : '', notes } : t))
     try {
       await api.updateTask(currentId, task.id, { title, due, notes })
     } catch { loadTasks() }
@@ -141,6 +153,11 @@ export default function App() {
     setTasks([])
     setLists([])
     setCurrentId('')
+    setShowSettings(false)
+  }
+
+  const handleSettingsUpdate = (newSettings) => {
+    setSettings(newSettings)
   }
 
   // ── 렌더 ──────────────────────────────────────────────────────────
@@ -161,6 +178,7 @@ export default function App() {
         currentId={currentId}
         onSelect={id => setCurrentId(id)}
         onCreateList={handleCreateList}
+        onSettings={() => setShowSettings(true)}
         onSignOut={handleSignOut}
       />
 
@@ -201,7 +219,6 @@ export default function App() {
         />
       </main>
 
-      {/* FAB — 할 일 추가 */}
       <button className="fab" onClick={() => setModal({ mode: 'add' })} aria-label="할 일 추가">
         ＋
       </button>
@@ -212,6 +229,14 @@ export default function App() {
           task={modal.task}
           onSubmit={modal.mode === 'add' ? handleAdd : handleEdit}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsPanel
+          settings={settings}
+          onClose={() => setShowSettings(false)}
+          onUpdate={handleSettingsUpdate}
         />
       )}
     </div>

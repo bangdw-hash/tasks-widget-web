@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function Header({ lists, currentId, onSelect, onCreateList, onSignOut }) {
+export default function Header({ lists, currentId, onSelect, onCreateList, onSettings, onSignOut }) {
   const [showMenu, setShowMenu] = useState(false)
   const current = lists.find(l => l.id === currentId)
 
@@ -11,7 +11,6 @@ export default function Header({ lists, currentId, onSelect, onCreateList, onSig
       </div>
 
       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-        {/* 목록 전환 버튼 */}
         {lists.length > 1 && (
           <div style={{ position: 'relative' }}>
             <button className="hdr-btn" onClick={() => setShowMenu(v => !v)} title="목록 전환">
@@ -40,9 +39,8 @@ export default function Header({ lists, currentId, onSelect, onCreateList, onSig
           </div>
         )}
 
-        <button className="hdr-btn" onClick={onSignOut} title="로그아웃">
-          ⏻
-        </button>
+        <button className="hdr-btn" onClick={onSettings} title="설정">⚙</button>
+        <button className="hdr-btn" onClick={onSignOut} title="로그아웃">⏻</button>
       </div>
     </header>
   )
