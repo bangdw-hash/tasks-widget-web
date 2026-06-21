@@ -24,10 +24,11 @@ async function waitForUser(maxMs = 4000) {
 // 실시간 리스너 — Firestore 문서가 바뀌면 즉시 callback 호출
 // 반환값: 구독 해제 함수 (컴포넌트 언마운트 시 호출)
 export function subscribeSettings(callback) {
+  if (!db) return () => {}
   let unsub = null
 
   waitForUser().then(user => {
-    if (!user) return
+    if (!user || !db) return
     unsub = onSnapshot(
       doc(db, 'users', user.uid),
       (snap) => callback(snap.exists() ? { ...DEFAULTS, ...snap.data() } : { ...DEFAULTS }),
@@ -40,7 +41,7 @@ export function subscribeSettings(callback) {
 
 export async function saveSettings(settings) {
   const user = getFirebaseUser()
-  if (!user) return
+  if (!user || !db) return
   const data = Object.fromEntries(
     SYNC_KEYS.map(k => [k, settings[k]]).filter(([, v]) => v !== undefined)
   )

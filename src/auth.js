@@ -1,4 +1,4 @@
-import { getAuth, GoogleAuthProvider, signInWithCredential, signOut as fbSignOut } from 'firebase/auth'
+import { GoogleAuthProvider, signInWithCredential, signOut as fbSignOut } from 'firebase/auth'
 import { auth } from './firebase.js'
 
 const CLIENT_ID   = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -19,6 +19,7 @@ function _save(token, expiresIn) {
 }
 
 async function _signInToFirebase(accessToken) {
+  if (!auth) return
   try {
     const credential = GoogleAuthProvider.credential(null, accessToken)
     const result = await signInWithCredential(auth, credential)
@@ -49,37 +50,57 @@ export function signOut() {
   _firebaseUser = null
   sessionStorage.removeItem(TOKEN_KEY)
   sessionStorage.removeItem(TOKEN_EXP_KEY)
-  fbSignOut(auth).catch(() => {})
+  if (auth) fbSignOut(auth).catch(() => {})
 }
 
 export function initAuth(onSignIn, onExpire) {
+  let called = false
+  // 한 번만 콜백을 호출하도록 보장
+  const done = (fn) => { if (!called) { called = true; fn() } }
+
+  // 안전장치: 10초 안에 GIS가 로드되지 않으면 로그인 화면으로 전환
+  const fallback = setTimeout(() => done(() => onExpire?.()), 10000)
+
   const tryInit = () => {
     if (!window.google?.accounts?.oauth2) {
       setTimeout(tryInit, 100)
       return
     }
+    clearTimeout(fallback)
+
     tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
       callback: (resp) => {
-        if (resp.error) { onExpire?.(); return }
+        if (resp.error) { done(() => onExpire?.()); return }
         _save(resp.access_token, parseInt(resp.expires_in, 10))
         _signInToFirebase(resp.access_token)
-        onSignIn(resp.access_token)
+        done(() => onSignIn(resp.access_token))
       },
     })
+
     if (isSignedIn()) {
       _signInToFirebase(_accessToken)
-      onSignIn(_accessToken)
+      done(() => onSignIn(_accessToken))
     } else {
-      onExpire?.()
+      done(() => onExpire?.())
     }
   }
+
   tryInit()
 }
 
 export function requestSignIn() {
-  tokenClient?.requestAccessToken({ prompt: '' })
+  if (tokenClient) {
+    tokenClient.requestAccessToken({ prompt: '' })
+  } else {
+    // GIS가 아직 로드 중이면 잠시 후 재시도
+    const retry = () => {
+      if (tokenClient) { tokenClient.requestAccessToken({ prompt: '' }) }
+      else setTimeout(retry, 200)
+    }
+    retry()
+  }
 }
 
 export function scheduleRefresh(onExpire) {
