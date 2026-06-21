@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { initAuth, requestSignIn, signOut, scheduleRefresh } from './auth.js'
-import { loadSettings, saveSettings, applySettings, resetStyles, DEFAULTS } from './cloudSettings.js'
+import { subscribeSettings, saveSettings, applySettings, resetStyles, DEFAULTS } from './cloudSettings.js'
 import * as api from './api.js'
 import LoginScreen from './components/LoginScreen.jsx'
 import Header from './components/Header.jsx'
@@ -31,14 +31,17 @@ export default function App() {
     )
   }, [])
 
-  // ── 로그인 후 목록 + 설정 로드 ────────────────────────────────────
+  // ── 로그인 후 목록 로드 + 설정 실시간 구독 ───────────────────────
   useEffect(() => {
     if (!authed) return
     scheduleRefresh(() => setAuthed(false))
     loadLists()
-    loadSettings().then(s => {
-      if (s) { setSettings(s); applySettings(s) }
+    // Firestore 실시간 리스너 — PC·모바일 어디서 바꿔도 즉시 반영
+    const unsubSettings = subscribeSettings((s) => {
+      setSettings(s)
+      applySettings(s)
     })
+    return () => unsubSettings()
   }, [authed])
 
   // ── 로그아웃 시 스타일 초기화 ─────────────────────────────────────
